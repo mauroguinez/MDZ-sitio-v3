@@ -847,6 +847,11 @@ footer .wrap{display:block;padding-block:0}
 #mdz-toast .tv{flex:none;border:0;border-radius:9px;background:var(--yellow);color:var(--navy);font:inherit;font-weight:700;font-size:14px;padding:9px 14px;cursor:pointer}
 @media (max-width:900px){#mdz-toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))}}
 
+/* ---------- búsqueda con corrección ---------- */
+.sg-fix{padding:10px 14px;font-size:13.5px;color:var(--muted);border-bottom:1px solid var(--line);background:var(--chip)}
+.sg-fix b{color:var(--ink);font-weight:700}
+.ex-fix{display:block;font-family:var(--body);font-size:14px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--muted);margin-top:4px}
+
 </style>
 
 <div class="topbar"><div class="wrap"><span>Envío a domicilio en <b>todo Gran Mendoza</b>, en 24 a 48 h hábiles</span><span class="tb-r"><span>Lunes a sábado de 8 a 20</span><a href="https://wa.me/5492615390821?text=Hola%20MDZ%2C%20quiero%20pedir%20un%20presupuesto." target="_blank" rel="noopener">WhatsApp 261 539-0821</a></span></div></div>
@@ -1038,6 +1043,7 @@ function render(keep){
   [...$('tabs').children].forEach(b=>b.setAttribute('aria-selected',+b.dataset.r===st.r));
   const subs=st.r>=0?R[st.r][3]:[];$('subs').innerHTML=subs.map(([sb,c])=>`<button data-s="${esc(sb)}" aria-pressed="${st.s===sb}">${esc(sb)}<small>${c}</small></button>`).join('');
   $('ex-title').textContent=st.q?`Resultados para “${st.q}”`:st.r>=0?(st.s||R[st.r][0]):'Todos los productos';
+  if(st.q&&CAT&&VOC){QM(st.q);const fx=didYouMean(st.q);if(fx)$('ex-title').innerHTML=`Resultados para “${esc(fx)}” <small class="ex-fix">Buscaste “${esc(st.q)}”</small>`}
   if(!CAT){return}
   drawFacets();drawActive();
   if(st.r<0&&!st.q&&!st.b.size&&!st.m.size&&st.sort==='rel'){
@@ -1165,13 +1171,29 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('ov3').hidden)cl
 const SYN={canilla:['griferia','monocomando','grifo'],canillas:['griferia','monocomando'],grifo:['griferia','canilla'],griferia:['grifo','monocomando'],cano:['tubo'],canos:['tubo'],tubo:['cano'],calefon:['calefon'],termo:['termotanque'],tanque:['cisterna','tanque'],cisterna:['tanque'],bomba:['presurizadora','bomba'],lavamanos:['lavatorio'],pileta:['bacha'],bacha:['pileta'],llave:['valvula','llave'],valvula:['llave'],foco:['lampara','led'],lampara:['led'],luz:['led','lampara'],pintura:['latex','pintura'],inodoro:['inodoro'],water:['inodoro'],wc:['inodoro'],ducha:['ducha','flor'],flexible:['flexible','conexion'],codo:['codo'],teflon:['teflon','sellador'],aire:['aire','split'],estufa:['calefactor','estufa'],calefactor:['estufa'],cable:['cable','conductor'],enchufe:['toma','tomacorriente'],toma:['tomacorriente'],tomacorriente:['toma'],ceramico:['ceramica'],pegamento:['adhesivo','pegamento'],adhesivo:['pegamento']};
 let VOC=null;
 function lev(a,b,max){if(Math.abs(a.length-b.length)>max)return max+1;let prev=Array.from({length:b.length+1},(_,j)=>j);for(let i=1;i<=a.length;i++){const cur=[i];let mn=i;for(let j=1;j<=b.length;j++){cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));if(cur[j]<mn)mn=cur[j]}if(mn>max)return max+1;prev=cur}return prev[b.length]}
+/* MDZ v2: búsqueda que tolera errores de tipeo ("trrmo", "tremo", "membrna"...) */
+const FIX=new Map();  // palabra escrita -> corrección que se usó (para el aviso "Mostrando resultados para…")
+function osa(a,b,max){if(Math.abs(a.length-b.length)>max)return max+1;const n=a.length,m=b.length;let p2=null,p1=Array.from({length:m+1},(_,j)=>j);
+  for(let i=1;i<=n;i++){const c=[i];let mn=i;for(let j=1;j<=m;j++){let v=Math.min(p1[j]+1,c[j-1]+1,p1[j-1]+(a[i-1]===b[j-1]?0:1));
+    if(i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1])v=Math.min(v,p2[j-2]+1);c[j]=v;if(v<mn)mn=v}if(mn>max)return max+1;p2=p1;p1=c}return p1[m]}
+function fuzzy(w){const md=w.length>=9?2:1,G=new Map();let best=md+1;
+  for(const v of VOC){if(v.length<3)continue;
+    let d=osa(w,v,md),m=v;
+    if(d>md||v.length>w.length+1){for(const L of (w.length>=6?[w.length-1,w.length,w.length+1]:[w.length,w.length+1])){if(L<4||L>v.length)continue;const pre=v.slice(0,L),dd=osa(w,pre,md);if(dd<d||(dd===d&&m!==v&&pre.length>m.length)){d=dd;m=pre}}}
+    if(d===0||d>md||d>best)continue;if(d<best){best=d;G.clear()}
+    G.set(m,(G.get(m)||0)+(FREQ.get(v)||1))}
+  const L=[...G].sort((a,b)=>b[1]-a[1]);if(!L.length)return [];const top=L[0][1];
+  return L.filter(x=>x[1]>=top*0.2).slice(0,3)}
 function expand(w){const out=new Set([w]);if(w.length>4&&w.endsWith('es'))out.add(w.slice(0,-2));if(w.length>3&&w.endsWith('s'))out.add(w.slice(0,-1));(SYN[w]||[]).forEach(x=>out.add(x));
-  if(VOC&&w.length>=4&&!/\d/.test(w)&&!VOC.some(v=>v.includes(w))){const md=w.length>=7?2:1;let n=0;for(const v of VOC){if(v.length<3)continue;const vv=v.slice(0,Math.max(w.length,Math.min(v.length,w.length+1)));if(lev(w,vv,md)<=md||lev(w,v,md)<=md){out.add(v);if(++n>=10)break}}}
+  if(VOC&&w.length>=4&&!/\d/.test(w)){let lit=0;for(const v of VOC){if(v.includes(w)){lit+=FREQ.get(v)||1;if(lit>2)break}}
+    if(lit<=2){const C=fuzzy(w);if(C.length&&(lit===0||C[0][1]>=lit*5)){C.forEach(([m])=>{out.add(m);(SYN[m]||[]).forEach(x=>out.add(x))});FIX.set(w,C[0][0])}}}
   return [...out]}
+function didYouMean(q){let ch=false;const t=norm(q).split(/\s+/).filter(Boolean).map(w=>{if(FIX.has(w)){ch=true;return DISP.get(FIX.get(w))||FIX.get(w)}return w});return ch?t.join(' '):''}
 const QMC=new Map();
 function QM(q){const k=norm(q);if(QMC.has(k))return QMC.get(k);const G=k.split(/\s+/).filter(Boolean).map(expand);
   const f=t=>G.every(g=>g.some(x=>t.includes(x)));f.G=G;if(QMC.size>200)QMC.clear();QMC.set(k,f);return f}
-function buildVoc(){const S=new Set();CAT.p.forEach(p=>p[4].split(/[^a-z0-9]+/).forEach(w=>{if(w.length>=3)S.add(w)}));VOC=[...S];QMC.clear()}
+const FREQ=new Map(),DISP=new Map();
+function buildVoc(){const S=new Set();CAT.p.forEach(p=>{const seen=new Set();p[4].split(/[^a-z0-9]+/).forEach(w=>{if(w.length>=3){S.add(w);if(!seen.has(w)){seen.add(w);FREQ.set(w,(FREQ.get(w)||0)+1)}}})});CAT.p.forEach(p=>p[0].toLowerCase().split(/[^a-záéíóúüñ0-9]+/).forEach(t=>{const k=norm(t);if(k.length>=3&&!DISP.has(k)&&t!==k)DISP.set(k,t)}));VOC=[...S];QMC.clear();FIX.clear()}
 // ===== suggestions =====
 function rankHits(q,lim){const f=QM(q),G=f.G,res=[];
   CAT.p.forEach((p,i)=>{if(!f(p[4]))return;const nm=norm(p[0]);let sc=0;G.forEach(g=>{if(g.some(x=>nm.includes(x)))sc+=2;if(g.some(x=>new RegExp('(^|[^a-z0-9])'+x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).test(nm)))sc+=1;if(g.some(x=>nm.startsWith(x)))sc+=2});res.push([sc,i])});
@@ -1186,7 +1208,7 @@ function sugg(id){const inp=$(id),box=$('sg-'+id);let sel=-1,t;
   function draw(){const q=inp.value.trim();if(!CAT||q.length<2){close();return}
     const {n,top}=rankHits(q,6);
     const subs=[];const f=QM(q);CAT.s.forEach((L,r)=>L.forEach((sb,k)=>{if(subs.length<3&&f(norm(sb+' '+R[r][0])))subs.push([r,sb])}));
-    let h='';
+    let h='';const fx=didYouMean(q);if(fx&&top.length)h+=`<div class="sg-fix">Mostrando resultados para <b>${esc(fx)}</b></div>`;
     if(subs.length)h+=`<div class="sg-h">Rubros</div>`+subs.map(([r,sb])=>`<button class="sg-cat" data-r="${r}" data-s="${esc(sb)}">${esc(sb)} · ${esc(R[r][0])}</button>`).join('');
     if(top.length){h+=`<div class="sg-h">Productos</div>`+top.map(i=>{const p=CAT.p[i];return `<button class="sg-it" role="option" data-i="${i}"><div class="pimg" style="${spr(i)}"></div><div><div class="t">${hl(p[0],q)}</div><div class="m">${esc(p[1]||'')}${p[1]?' · ':''}${esc(CAT.s[p[2]][p[3]])}</div></div></button>`}).join('');
       h+=`<button class="sg-all" data-all="1">Ver los ${fmt(n)} resultados de “${esc(q)}” →</button>`}
