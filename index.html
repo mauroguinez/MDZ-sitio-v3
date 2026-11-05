@@ -12,13 +12,15 @@
  vendedores: el PRIMERO es el número principal (el que usan todos los botones de WhatsApp).
    Para sumar un vendedor, agregá una línea:  {nombre:'Mauro', tel:'549261XXXXXXX'},
    El número va con 549 + característica sin el 0 + número sin el 15. Ej: 261 15 539-0821 -> 5492615390821
-   Con un solo vendedor no se muestra el selector; con dos o más, el cliente elige al enviar la lista.
+   Con dos o más vendedores, CADA botón de WhatsApp pregunta primero con quién hablar (vendedor.js).
+   Si cambiás vendedores acá, cambialos también al principio de vendedor.js (lo usan las páginas de producto).
  destacados: nombres EXACTOS de productos (como aparecen en la web) para la sección "Lo más pedido".
  umami: para activar las estadísticas, creá el sitio en cloud.umami.is y pegá el "Website ID" en id.
 ============================================================================== */
 window.MDZ_CONFIG={
   vendedores:[
-    {nombre:'Cualquiera de nosotros', tel:'5492615390821'}
+    {nombre:'Tomás', tel:'5492616609480'},
+    {nombre:'Mauro', tel:'5492615390821'}
   ],
   destacados:[],
   umami:{id:'', src:'https://cloud.umami.is/script.js'}
@@ -1353,7 +1355,7 @@ function postForm(name,data){const b=new URLSearchParams(Object.assign({'form-na
 /* --- datos del cliente en la lista --- */
 (function(){
   const vs=$('lvend');if(vs){vs.innerHTML=VEND.map(v=>`<option value="${esc(v.tel)}">${esc(v.nombre)}</option>`).join('');
-    const saved=lsGet('mdz_vend');if(saved&&VEND.some(v=>v.tel===saved))vs.value=saved;$('lvend-row').hidden=VEND.length<2}
+    const saved=lsGet('mdz_vend');if(saved&&VEND.some(v=>v.tel===saved))vs.value=saved;$('lvend-row').hidden=true}
   ['lnom','lzona'].forEach(id=>{const e=$(id);if(e){e.value=lsGet('mdz_'+id)||e.value}});
   const foot=$('ldir')&&$('ldir').closest('footer');
   if(foot){foot.addEventListener('input',e=>{if(/^(lnom|lzona|lcuando|lvend|ldir)$/.test(e.target.id)){if(e.target.id!=='ldir'&&e.target.id!=='lcuando')lsSet(e.target.id==='lvend'?'mdz_vend':'mdz_'+e.target.id,e.target.value);drawL()}});
@@ -1639,4 +1641,5 @@ document.getElementById('copy').addEventListener('click',async e=>{const b=e.cur
 })();
 
 </script>
+<script src="vendedor.js" defer></script>
 </body></html>
